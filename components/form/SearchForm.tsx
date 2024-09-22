@@ -3,17 +3,25 @@ import SearchResult from '@/components/translation/SearchResult';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { useGetTranslations } from '@/hooks/useTranslation';
 import { Translation } from '@/types/translation.type';
-import { createClient } from '@/utils/supabase/client';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Fuse from 'fuse.js';
 import { debounce } from 'lodash';
 import { SearchIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-import React from 'react';
-const supabase = createClient();
+const options = {
+  includeScore: true,
+  threshold: 0.4,
+  keys: ['source_text', 'translated_text'],
+  ignoreLocation: true,
+  minMatchCharLength: 2,
+  shouldSort: true,
+  findAllMatches: true,
+};
 
 const formSchema = z.object({
   search_text: z.string().optional(),
@@ -21,9 +29,10 @@ const formSchema = z.object({
   target_language: z.string().optional(),
   sort_by: z.string().optional(),
 });
+
 export default function SearchForm() {
-  const [results, setResults] = useState<Translation[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [filteredResults, setFilteredResults] = useState<Translation[]>([]);
+  const { data: results, isLoading, isError } = useGetTranslations();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -33,38 +42,25 @@ export default function SearchForm() {
       sort_by: 'created_at',
     },
   });
-  const fetchResults = async (values: z.infer<typeof formSchema>) => {
-    setLoading(true);
-    const { search_text, source_language, target_language, sort_by } = values;
 
-    let query = supabase.from('translations').select();
-    if (search_text) {
-      query = query.or(`source_text.ilike.%${search_text}%,translated_text.ilike.%${search_text}%`);
-    }
-
-    // if (source_language && source_language !== "all") {
-    //   query = query.eq("source_language", source_language);
-    // }
-    // if (target_language && target_language !== "all") {
-    //   query = query.eq("target_language", target_language);
-    // }
-    // if (sort_by) {
-    //   query = query.order(sort_by, { ascending: true });
-    // }
-
-    const { data, error } = await query;
-    setLoading(false);
-    if (error) {
-      console.error('Error fetching data:', error);
-    } else {
-      setResults(data);
-    }
-  };
-  const debouncedFetchResults = useCallback(debounce(fetchResults, 500), []);
+  const debouncedSearch = useCallback(
+    debounce((values: z.infer<typeof formSchema>) => {
+      const { search_text } = values;
+      if (search_text) {
+        const fuseInstance = new Fuse(results || [], options);
+        const filteredResults = fuseInstance.search(search_text).map(result => result.item);
+        setFilteredResults(filteredResults);
+      } else {
+        setFilteredResults(results || []);
+      }
+    }, 300),
+    [results]
+  );
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    debouncedFetchResults(values);
+    debouncedSearch(values);
   };
+
   return (
     <>
       <Form {...form}>
@@ -89,7 +85,11 @@ export default function SearchForm() {
       </Form>
       <div className="mt-10">
         <h2 className="mb-4 text-2xl font-semibold">Results</h2>
-        <SearchResult results={results} loading={loading} />
+        {isError ? (
+          <p className="text-red-500">An error occurred while fetching translations</p>
+        ) : (
+          <SearchResult results={filteredResults} loading={isLoading} />
+        )}
       </div>
     </>
   );

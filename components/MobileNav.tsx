@@ -1,8 +1,8 @@
-import { Sheet, SheetTrigger, SheetContent } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { menuLinks } from "@/consts";
-import { usePathname } from "next/navigation";
+import { Sheet, SheetTrigger, SheetContent } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { menuLinks } from '@/consts';
+import { usePathname } from 'next/navigation';
 
 export default function MobileNav() {
   const currentPath = usePathname();
@@ -25,14 +25,12 @@ export default function MobileNav() {
             </h1>
           </Link>
           <div className="grid gap-2 space-y-3 py-6">
-            {menuLinks.map((link) => (
+            {menuLinks.map(link => (
               <Link
                 key={link.href}
                 href={link.href}
                 className={`hover:underline-2 text-md font-medium underline-offset-4 hover:underline ${
-                  currentPath === link.href
-                    ? "underline-2 font-semibold text-primary underline"
-                    : "text-slate-600"
+                  currentPath === link.href ? 'underline-2 font-semibold text-primary underline' : 'text-slate-600'
                 } `}
               >
                 {link.label}
